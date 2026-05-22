@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>SecureCam · Camera</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080b0f;--surface:#0d1117;--surface2:#111820;
+  --border:#1a2332;--border2:#243040;
+  --accent:#00e5ff;--accent2:#ff3d71;--green:#00e676;--amber:#ffab40;
+  --text:#c8d6e5;--text-dim:#4a6080;
+  --mono:'Share Tech Mono',monospace;--sans:'Rajdhani',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+
+/* Layout */
+.app{display:flex;flex-direction:column;height:100vh;max-width:480px;margin:0 auto;position:relative}
+
+/* Header */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0.75rem 1rem;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.header-left{display:flex;align-items:center;gap:0.6rem}
+.back-btn{color:var(--text-dim);text-decoration:none;font-size:1.2rem;line-height:1}
+.logo{font-family:var(--mono);font-size:0.75rem;letter-spacing:0.2em;color:var(--accent)}
+.role-badge{
+  font-family:var(--mono);font-size:0.6rem;letter-spacing:0.1em;
+  padding:0.2rem 0.5rem;border:1px solid var(--accent);color:var(--accent);border-radius:2px;
+}
+.conn-status{
+  display:flex;align-items:center;gap:0.4rem;
+  font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);
+}
+.conn-dot{width:6px;height:6px;border-radius:50%;background:var(--text-dim)}
+.conn-dot.online{background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite}
+.conn-dot.streaming{background:var(--accent2);box-shadow:0 0 6px var(--accent2);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* Video Area */
+.video-wrap{
+  position:relative;flex:1;background:#000;overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+}
+#videoEl{
+  width:100%;height:100%;object-fit:cover;
+  transform:scaleX(-1);/* mirror front cam */
+}
+#videoEl.rear{transform:scaleX(1)}
+#motionCanvas{
+  position:absolute;inset:0;width:100%;height:100%;
+  pointer-events:none;opacity:0.3;
+}
+
+.live-badge{
+  position:absolute;top:1rem;left:1rem;
+  display:flex;align-items:center;gap:0.4rem;
+  background:rgba(255,61,113,0.15);border:1px solid var(--accent2);
+  padding:0.3rem 0.7rem;border-radius:2px;
+  font-family:var(--mono);font-size:0.65rem;letter-spacing:0.15em;
+  color:var(--accent2);opacity:0;transition:opacity 0.3s;
+}
+.live-badge.show{opacity:1}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent2);animation:pulse 1s infinite}
+
+.viewers-badge{
+  position:absolute;top:1rem;right:1rem;
+  background:rgba(0,0,0,0.6);border:1px solid var(--border2);
+  padding:0.3rem 0.6rem;border-radius:2px;
+  font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);
+}
+
+.motion-flash{
+  position:absolute;inset:0;border:3px solid var(--accent2);
+  opacity:0;pointer-events:none;transition:opacity 0.1s;
+  box-shadow:inset 0 0 40px rgba(255,61,113,0.3);
+}
+.motion-flash.active{opacity:1}
+
+.no-stream{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:1rem;
+  color:var(--text-dim);text-align:center;padding:2rem;
+}
+.no-stream-icon{font-size:3rem;opacity:0.3}
+.no-stream p{font-family:var(--mono);font-size:0.7rem;letter-spacing:0.1em}
+
+/* Panel */
+.panel{
+  background:var(--surface);border-top:1px solid var(--border);
+  padding:1rem;flex-shrink:0;display:flex;flex-direction:column;gap:1rem;
+}
+
+/* Pairing */
+.pair-section{display:flex;flex-direction:column;gap:0.75rem}
+.pair-row{display:flex;align-items:center;gap:0.75rem}
+.code-display{
+  flex:1;display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface2);border:1px solid var(--border2);
+  padding:0.6rem 0.75rem;border-radius:3px;
+  font-family:var(--mono);font-size:1rem;letter-spacing:0.3em;color:var(--accent);
+}
+.icon-btn{
+  width:36px;height:36px;border:1px solid var(--border2);background:var(--surface2);
+  border-radius:3px;display:flex;align-items:center;justify-content:center;
+  font-size:1rem;cursor:pointer;transition:all 0.2s;color:var(--text-dim);
+  flex-shrink:0;
+}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+.qr-wrap{
+  display:none;align-items:center;gap:1rem;
+  background:var(--surface2);border:1px solid var(--border2);
+  padding:0.75rem;border-radius:3px;
+}
+.qr-wrap.show{display:flex}
+.qr-wrap img{width:80px;height:80px;border-radius:2px}
+.qr-info{font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);line-height:1.6}
+.qr-info strong{color:var(--text);display:block;margin-bottom:0.3rem}
+
+/* Controls */
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:0.75rem}
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:0.5rem;
+  padding:0.75rem;border-radius:3px;border:1px solid var(--border2);
+  background:var(--surface2);color:var(--text);cursor:pointer;
+  font-family:var(--sans);font-size:0.85rem;font-weight:600;letter-spacing:0.05em;
+  transition:all 0.2s;
+}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{
+  grid-column:span 2;
+  background:rgba(0,229,255,0.08);border-color:var(--accent);color:var(--accent);
+  font-size:0.9rem;padding:1rem;
+}
+.btn.primary:hover{background:rgba(0,229,255,0.15)}
+.btn.stop{background:rgba(255,61,113,0.08);border-color:var(--accent2);color:var(--accent2)}
+.btn.stop:hover{background:rgba(255,61,113,0.15)}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+
+/* Sensitivity */
+.slider-row{display:flex;align-items:center;gap:0.75rem}
+.slider-label{font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);white-space:nowrap}
+input[type=range]{
+  flex:1;-webkit-appearance:none;background:var(--border2);height:3px;border-radius:2px;outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+  background:var(--accent);cursor:pointer;
+}
+.slider-val{font-family:var(--mono);font-size:0.6rem;color:var(--accent);min-width:2.5rem;text-align:right}
+
+/* Events log */
+.events-mini{
+  max-height:80px;overflow-y:auto;display:flex;flex-direction:column;gap:0.3rem;
+}
+.event-item{
+  display:flex;align-items:center;gap:0.5rem;
+  font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);
+  padding:0.3rem 0.5rem;background:var(--surface2);border-radius:2px;
+}
+.event-item .ev-dot{width:5px;height:5px;border-radius:50%;background:var(--accent2);flex-shrink:0}
+.event-item .ev-time{color:var(--amber);margin-right:auto}
+
+/* Recording indicator */
+.rec-badge{
+  position:absolute;bottom:1rem;left:1rem;
+  display:none;align-items:center;gap:0.4rem;
+  background:rgba(255,61,113,0.15);border:1px solid var(--accent2);
+  padding:0.25rem 0.6rem;border-radius:2px;
+  font-family:var(--mono);font-size:0.6rem;color:var(--accent2);
+}
+.rec-badge.show{display:flex}
+.rec-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--accent2);animation:pulse 1s infinite}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <a class="back-btn" href="/">←</a>
+      <span class="logo">SECURECAM</span>
+      <span class="role-badge">📷 CAMERA</span>
+    </div>
+    <div class="conn-status">
+      <div class="conn-dot" id="connDot"></div>
+      <span id="connLabel">OFFLINE</span>
+    </div>
+  </div>
+
+  <!-- Video -->
+  <div class="video-wrap">
+    <div class="no-stream" id="noStream">
+      <div class="no-stream-icon">📷</div>
+      <p>TAP START TO BEGIN STREAMING</p>
+    </div>
+    <video id="videoEl" autoplay playsinline muted></video>
+    <canvas id="motionCanvas"></canvas>
+    <div class="live-badge" id="liveBadge"><div class="live-dot"></div>LIVE</div>
+    <div class="viewers-badge" id="viewersBadge">👁 0</div>
+    <div class="motion-flash" id="motionFlash"></div>
+    <div class="rec-badge" id="recBadge"><div class="rec-badge-dot"></div>REC</div>
+  </div>
+
+  <!-- Panel -->
+  <div class="panel">
+    <!-- Pairing code -->
+    <div class="pair-section">
+      <div class="pair-row">
+        <div class="code-display">
+          <span id="pairCode">------</span>
+        </div>
+        <div class="icon-btn" id="qrBtn" title="Show QR Code">⊞</div>
+        <div class="icon-btn" id="copyBtn" title="Copy code">⎘</div>
+        <div class="icon-btn" id="newCodeBtn" title="New code">↺</div>
+      </div>
+      <div class="qr-wrap" id="qrWrap">
+        <img id="qrImg" src="" alt="QR">
+        <div class="qr-info">
+          <strong>SCAN TO PAIR VIEWER</strong>
+          Open viewer on another device and scan, or enter code manually.
+        </div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button class="btn primary" id="startBtn">▶ START STREAM</button>
+      <button class="btn" id="flipBtn" disabled>🔄 FLIP</button>
+      <button class="btn" id="motionBtn" disabled>👁 MOTION ON</button>
+    </div>
+
+    <!-- Sensitivity -->
+    <div class="slider-row">
+      <span class="slider-label">SENSITIVITY</span>
+      <input type="range" id="sensitivitySlider" min="1" max="10" value="4">
+      <span class="slider-val" id="sensitivityVal">4</span>
+    </div>
+
+    <!-- Events log -->
+    <div class="events-mini" id="eventsList"></div>
+  </div>
+</div>
+
+<script src="/securecam.js"></script>
+<script>
+'use strict';
+const { SignalingClient, PeerCamera, MotionDetector } = window.SecureCam;
+
+// ─── State ────────────────────────────────────────────────
+let stream = null;
+let motionOn = false;
+let facingMode = 'environment';
+let pairCode = null;
+let viewerCount = 0;
+let peers = {}; // viewerId → PeerCamera
+let recorder = null;
+let isStreaming = false;
+
+const signaling = new SignalingClient();
+const motionDetector = new MotionDetector();
+
+// ─── DOM ──────────────────────────────────────────────────
+const videoEl = document.getElementById('videoEl');
+const motionCanvas = document.getElementById('motionCanvas');
+const liveBadge = document.getElementById('liveBadge');
+const viewersBadge = document.getElementById('viewersBadge');
+const motionFlash = document.getElementById('motionFlash');
+const recBadge = document.getElementById('recBadge');
+const noStream = document.getElementById('noStream');
+const connDot = document.getElementById('connDot');
+const connLabel = document.getElementById('connLabel');
+const pairCodeEl = document.getElementById('pairCode');
+const qrWrap = document.getElementById('qrWrap');
+const qrImg = document.getElementById('qrImg');
+const startBtn = document.getElementById('startBtn');
+const flipBtn = document.getElementById('flipBtn');
+const motionBtn = document.getElementById('motionBtn');
+const sensitivitySlider = document.getElementById('sensitivitySlider');
+const sensitivityVal = document.getElementById('sensitivityVal');
+const eventsList = document.getElementById('eventsList');
+
+// ─── UI Helpers ───────────────────────────────────────────
+function setConnStatus(state) {
+  connDot.className = 'conn-dot ' + state;
+  const labels = { '': 'OFFLINE', online: 'CONNECTED', streaming: 'STREAMING' };
+  connLabel.textContent = labels[state] || state.toUpperCase();
+}
+
+function addEvent(text) {
+  const now = new Date().toLocaleTimeString('en-US', { hour12: false });
+  const div = document.createElement('div');
+  div.className = 'event-item';
+  div.innerHTML = `<div class="ev-dot"></div><span class="ev-time">${now}</span>${text}`;
+  eventsList.prepend(div);
+  if (eventsList.children.length > 8) eventsList.lastChild.remove();
+}
+
+// ─── Signaling ────────────────────────────────────────────
+signaling.connect();
+
+signaling.addEventListener('open', () => {
+  setConnStatus('online');
+  // Join/rejoin room
+  if (pairCode) {
+    signaling.send({ type: 'join-camera', code: pairCode });
+  } else {
+    signaling.send({ type: 'join-camera' });
+  }
+});
+
+signaling.addEventListener('close', () => setConnStatus(''));
+
+signaling.addEventListener('message', async ({ detail: msg }) => {
+  if (msg.type === 'joined') {
+    pairCode = msg.code;
+    pairCodeEl.textContent = pairCode;
+    updateQR();
+    addEvent('Room joined: ' + pairCode);
+  }
+
+  if (msg.type === 'viewer-joined') {
+    viewerCount++;
+    viewersBadge.textContent = '👁 ' + viewerCount;
+    addEvent('Viewer connected');
+    // Create peer connection for this viewer
+    if (stream) await connectToViewer(msg.id);
+  }
+
+  if (msg.type === 'viewer-left') {
+    viewerCount = Math.max(0, viewerCount - 1);
+    viewersBadge.textContent = '👁 ' + viewerCount;
+    if (peers[msg.id]) { peers[msg.id].close(); delete peers[msg.id]; }
+    addEvent('Viewer disconnected');
+  }
+
+  if (msg.type === 'answer') {
+    const peer = peers[msg.fromId];
+    if (peer) await peer.handleAnswer(msg.sdp);
+  }
+
+  if (msg.type === 'ice-candidate') {
+    const peer = peers[msg.fromId];
+    if (peer) await peer.handleIce(msg.candidate);
+  }
+});
+
+async function connectToViewer(id) {
+  const peer = new PeerCamera(signaling, id);
+  peers[id] = peer;
+  peer.addEventListener('statechange', ({ detail }) => {
+    if (detail === 'connected') {
+      setConnStatus('streaming');
+      liveBadge.classList.add('show');
+    }
+    if (detail === 'disconnected' || detail === 'failed') {
+      // will reconnect via viewer-joined again
+    }
+  });
+  await peer.addStream(stream);
+  await peer.createOffer();
+}
+
+// ─── Camera ───────────────────────────────────────────────
+async function startStream() {
+  try {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 }
+      },
+      audio: false
+    });
+
+    videoEl.srcObject = stream;
+    videoEl.className = facingMode === 'user' ? '' : 'rear';
+    noStream.style.display = 'none';
+    isStreaming = true;
+
+    startBtn.textContent = '⏹ STOP STREAM';
+    startBtn.className = 'btn stop';
+    startBtn.style.gridColumn = 'span 2';
+    flipBtn.disabled = false;
+    motionBtn.disabled = false;
+
+    setConnStatus('streaming');
+    liveBadge.classList.add('show');
+    addEvent('Stream started');
+
+    // Connect to all existing viewers
+    // (server will send viewer-joined for each)
+
+    if (motionOn) motionDetector.start(videoEl, motionCanvas);
+  } catch (e) {
+    alert('Camera error: ' + e.message + '\n\nMake sure you granted camera permission.');
+  }
+}
+
+function stopStream() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  videoEl.srcObject = null;
+  noStream.style.display = 'flex';
+  isStreaming = false;
+  motionDetector.stop();
+  stopRecording();
+
+  // Close all peer connections
+  Object.values(peers).forEach(p => p.close());
+  peers = {};
+
+  startBtn.textContent = '▶ START STREAM';
+  startBtn.className = 'btn primary';
+  startBtn.style.gridColumn = 'span 2';
+  flipBtn.disabled = true;
+  motionBtn.disabled = true;
+  liveBadge.classList.remove('show');
+  setConnStatus('online');
+  addEvent('Stream stopped');
+}
+
+startBtn.addEventListener('click', () => {
+  if (isStreaming) stopStream();
+  else startStream();
+});
+
+flipBtn.addEventListener('click', async () => {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  addEvent('Camera flipped');
+  await startStream();
+});
+
+// ─── Motion Detection ─────────────────────────────────────
+motionBtn.addEventListener('click', () => {
+  motionOn = !motionOn;
+  motionBtn.textContent = motionOn ? '👁 MOTION ON' : '👁 MOTION OFF';
+  motionBtn.style.borderColor = motionOn ? 'var(--green)' : '';
+  motionBtn.style.color = motionOn ? 'var(--green)' : '';
+  if (motionOn && isStreaming) motionDetector.start(videoEl, motionCanvas);
+  else motionDetector.stop();
+  addEvent(motionOn ? 'Motion detection ON' : 'Motion detection OFF');
+});
+
+sensitivitySlider.addEventListener('input', () => {
+  const v = +sensitivitySlider.value;
+  sensitivityVal.textContent = v;
+  // Map 1-10 → sensitivity 0.005-0.05
+  motionDetector.setSensitivity(0.005 + (v - 1) * 0.005);
+});
+
+motionDetector.addEventListener('motion', ({ detail }) => {
+  // Flash border
+  motionFlash.classList.add('active');
+  setTimeout(() => motionFlash.classList.remove('active'), 300);
+
+  // Start recording if not already
+  if (!recorder) startRecording();
+
+  // Send alert to server
+  signaling.send({
+    type: 'motion-event',
+    snapshot: detail.snapshot,
+    level: detail.fraction > 5 ? 'high' : 'medium'
+  });
+
+  addEvent(`Motion! (${detail.fraction}%)`);
+
+  // Stop recording after 10s
+  setTimeout(stopRecording, 10000);
+});
+
+// ─── Recording ────────────────────────────────────────────
+function startRecording() {
+  if (!stream || recorder) return;
+  try {
+    recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
+    const chunks = [];
+    recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      // Auto-download the clip
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `motion-${Date.now()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+      recorder = null;
+      recBadge.classList.remove('show');
+    };
+    recorder.start(500);
+    recBadge.classList.add('show');
+  } catch (e) {
+    recorder = null;
+  }
+}
+
+function stopRecording() {
+  if (recorder && recorder.state === 'recording') recorder.stop();
+}
+
+// ─── QR / Copy ────────────────────────────────────────────
+function updateQR() {
+  const url = `${location.origin}/viewer?code=${pairCode}`;
+  qrImg.src = window.SecureCam.generateQRSVG(url);
+}
+
+document.getElementById('qrBtn').addEventListener('click', () => {
+  qrWrap.classList.toggle('show');
+});
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  if (pairCode) {
+    navigator.clipboard.writeText(pairCode).then(() => {
+      addEvent('Code copied to clipboard');
+    });
+  }
+});
+
+document.getElementById('newCodeBtn').addEventListener('click', () => {
+  if (confirm('Generate a new pairing code? Existing viewers will be disconnected.')) {
+    pairCode = null;
+    Object.values(peers).forEach(p => p.close());
+    peers = {};
+    signaling.send({ type: 'join-camera' });
+    addEvent('New code requested');
+  }
+});
+
+// ─── Keep screen awake (Wake Lock API) ────────────────────
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      await navigator.wakeLock.request('screen');
+    }
+  } catch {}
+}
+requestWakeLock();
+
+// ─── Init ─────────────────────────────────────────────────
+addEvent('Camera mode loaded');
+sensitivityVal.textContent = sensitivitySlider.value;
+</script>
+</body>
+</html>

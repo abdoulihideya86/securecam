@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>SecureCam · Viewer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080b0f;--surface:#0d1117;--surface2:#111820;
+  --border:#1a2332;--border2:#243040;
+  --accent:#00e5ff;--accent2:#ff3d71;--green:#00e676;--amber:#ffab40;
+  --text:#c8d6e5;--text-dim:#4a6080;
+  --mono:'Share Tech Mono',monospace;--sans:'Rajdhani',sans-serif;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+
+.app{display:flex;flex-direction:column;height:100vh;max-width:480px;margin:0 auto}
+
+/* Header */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0.75rem 1rem;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;
+}
+.header-left{display:flex;align-items:center;gap:0.6rem}
+.back-btn{color:var(--text-dim);text-decoration:none;font-size:1.2rem;line-height:1}
+.logo{font-family:var(--mono);font-size:0.75rem;letter-spacing:0.2em;color:var(--accent2)}
+.role-badge{font-family:var(--mono);font-size:0.6rem;letter-spacing:0.1em;padding:0.2rem 0.5rem;border:1px solid var(--accent2);color:var(--accent2);border-radius:2px}
+.conn-status{display:flex;align-items:center;gap:0.4rem;font-family:var(--mono);font-size:0.6rem;color:var(--text-dim)}
+.conn-dot{width:6px;height:6px;border-radius:50%;background:var(--text-dim)}
+.conn-dot.online{background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite}
+.conn-dot.watching{background:var(--accent);box-shadow:0 0 6px var(--accent);animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* Video */
+.video-wrap{position:relative;flex:1;background:#000;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer}
+#videoEl{width:100%;height:100%;object-fit:contain}
+
+.live-badge{
+  position:absolute;top:1rem;left:1rem;
+  display:flex;align-items:center;gap:0.4rem;
+  background:rgba(255,61,113,0.15);border:1px solid var(--accent2);
+  padding:0.3rem 0.7rem;border-radius:2px;
+  font-family:var(--mono);font-size:0.65rem;letter-spacing:0.15em;
+  color:var(--accent2);opacity:0;transition:opacity 0.3s;
+}
+.live-badge.show{opacity:1}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent2);animation:pulse 1s infinite}
+
+.latency-badge{
+  position:absolute;top:1rem;right:1rem;
+  background:rgba(0,0,0,0.6);border:1px solid var(--border2);
+  padding:0.3rem 0.6rem;border-radius:2px;
+  font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);
+}
+.fs-hint{
+  position:absolute;bottom:1rem;right:1rem;
+  background:rgba(0,0,0,0.5);padding:0.3rem 0.5rem;border-radius:2px;
+  font-family:var(--mono);font-size:0.55rem;color:var(--text-dim);
+  opacity:0;animation:fadeHint 4s 1s ease both;
+}
+@keyframes fadeHint{0%{opacity:0}20%{opacity:1}80%{opacity:1}100%{opacity:0}}
+
+.offline-msg{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:1rem;
+  color:var(--text-dim);text-align:center;padding:2rem;
+}
+.offline-icon{font-size:3rem;opacity:0.3}
+.offline-msg p{font-family:var(--mono);font-size:0.7rem;letter-spacing:0.1em}
+
+.motion-flash{position:absolute;inset:0;border:3px solid var(--accent2);opacity:0;pointer-events:none;transition:opacity 0.1s;box-shadow:inset 0 0 40px rgba(255,61,113,0.3)}
+.motion-flash.active{opacity:1}
+
+/* Pairing panel */
+.pair-panel{
+  background:var(--surface);border-top:1px solid var(--border);
+  padding:1rem;flex-shrink:0;display:flex;flex-direction:column;gap:0.75rem;
+}
+.pair-panel.hidden{display:none}
+
+.pair-row{display:flex;gap:0.75rem}
+.code-input{
+  flex:1;background:var(--surface2);border:1px solid var(--border2);
+  padding:0.6rem 0.75rem;border-radius:3px;
+  font-family:var(--mono);font-size:1rem;letter-spacing:0.3em;
+  color:var(--accent);outline:none;text-transform:uppercase;
+  transition:border-color 0.2s;
+}
+.code-input:focus{border-color:var(--accent)}
+.code-input::placeholder{color:var(--text-dim);font-size:0.7rem;letter-spacing:0.1em}
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:0.5rem;
+  padding:0.6rem 1.25rem;border-radius:3px;border:1px solid;
+  background:transparent;cursor:pointer;
+  font-family:var(--sans);font-size:0.85rem;font-weight:600;letter-spacing:0.05em;
+  transition:all 0.2s;white-space:nowrap;
+}
+.btn-primary{border-color:var(--accent2);color:var(--accent2)}
+.btn-primary:hover{background:rgba(255,61,113,0.1)}
+.btn-secondary{border-color:var(--border2);color:var(--text-dim)}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+
+.status-msg{font-family:var(--mono);font-size:0.65rem;color:var(--text-dim);text-align:center}
+.status-msg.error{color:var(--accent2)}
+.status-msg.success{color:var(--green)}
+
+/* Alerts panel */
+.alerts-panel{
+  background:var(--surface);border-top:1px solid var(--border);
+  padding:0.75rem 1rem;flex-shrink:0;
+}
+.alerts-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:0.5rem;
+}
+.alerts-title{font-family:var(--mono);font-size:0.6rem;letter-spacing:0.15em;color:var(--text-dim)}
+.clear-btn{font-family:var(--mono);font-size:0.55rem;color:var(--text-dim);background:none;border:none;cursor:pointer;text-decoration:underline}
+.clear-btn:hover{color:var(--accent2)}
+
+.alerts-list{max-height:100px;overflow-y:auto;display:flex;flex-direction:column;gap:0.3rem}
+.alert-item{
+  display:flex;align-items:center;gap:0.5rem;
+  padding:0.4rem 0.5rem;border-radius:2px;
+  background:var(--surface2);cursor:pointer;transition:background 0.2s;
+  animation:slideIn 0.2s ease;
+}
+@keyframes slideIn{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+.alert-item:hover{background:var(--border)}
+.alert-item .al-icon{font-size:0.9rem;flex-shrink:0}
+.alert-item .al-text{flex:1;font-family:var(--mono);font-size:0.6rem;color:var(--text)}
+.alert-item .al-time{font-family:var(--mono);font-size:0.55rem;color:var(--text-dim)}
+.alert-item .al-thumb{
+  width:32px;height:24px;object-fit:cover;border-radius:2px;border:1px solid var(--border2);
+}
+
+.notif-row{display:flex;align-items:center;justify-content:space-between}
+.notif-toggle{
+  display:flex;align-items:center;gap:0.5rem;cursor:pointer;
+  font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);
+}
+.toggle-pill{
+  width:32px;height:17px;border-radius:9px;border:1px solid var(--border2);
+  position:relative;transition:all 0.3s;background:var(--surface2);
+}
+.toggle-pill.on{border-color:var(--green);background:rgba(0,230,118,0.15)}
+.toggle-thumb{
+  position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;
+  background:var(--text-dim);transition:all 0.3s;
+}
+.toggle-pill.on .toggle-thumb{left:17px;background:var(--green)}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <a class="back-btn" href="/">←</a>
+      <span class="logo">SECURECAM</span>
+      <span class="role-badge">📱 VIEWER</span>
+    </div>
+    <div class="conn-status">
+      <div class="conn-dot" id="connDot"></div>
+      <span id="connLabel">OFFLINE</span>
+    </div>
+  </div>
+
+  <!-- Video -->
+  <div class="video-wrap" id="videoWrap">
+    <div class="offline-msg" id="offlineMsg">
+      <div class="offline-icon">📡</div>
+      <p id="offlineTxt">ENTER PAIRING CODE BELOW</p>
+    </div>
+    <video id="videoEl" autoplay playsinline></video>
+    <div class="live-badge" id="liveBadge"><div class="live-dot"></div>LIVE</div>
+    <div class="latency-badge" id="latencyBadge"></div>
+    <div class="motion-flash" id="motionFlash"></div>
+    <div class="fs-hint">TAP FOR FULLSCREEN</div>
+  </div>
+
+  <!-- Pairing panel -->
+  <div class="pair-panel" id="pairPanel">
+    <div class="pair-row">
+      <input class="code-input" id="codeInput" maxlength="6" placeholder="ENTER CODE" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <button class="btn btn-primary" id="connectBtn">CONNECT</button>
+    </div>
+    <div class="status-msg" id="statusMsg"></div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="alerts-panel">
+    <div class="alerts-header">
+      <div class="alerts-title">⚡ MOTION EVENTS</div>
+      <div style="display:flex;align-items:center;gap:1rem">
+        <div class="notif-toggle" id="notifToggle">
+          <div class="toggle-pill" id="togglePill">
+            <div class="toggle-thumb"></div>
+          </div>
+          NOTIFY
+        </div>
+        <button class="clear-btn" id="clearBtn">CLEAR</button>
+      </div>
+    </div>
+    <div class="alerts-list" id="alertsList">
+      <div style="font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);padding:0.5rem">No alerts yet</div>
+    </div>
+  </div>
+</div>
+
+<script src="/securecam.js"></script>
+<script>
+'use strict';
+const { SignalingClient, PeerViewer, NotificationManager } = window.SecureCam;
+
+// ─── State ────────────────────────────────────────────────
+let peer = null;
+let roomCode = null;
+let notifEnabled = false;
+const notifMgr = new NotificationManager();
+const signaling = new SignalingClient();
+
+// ─── DOM ──────────────────────────────────────────────────
+const videoEl = document.getElementById('videoEl');
+const offlineMsg = document.getElementById('offlineMsg');
+const offlineTxt = document.getElementById('offlineTxt');
+const liveBadge = document.getElementById('liveBadge');
+const latencyBadge = document.getElementById('latencyBadge');
+const motionFlash = document.getElementById('motionFlash');
+const connDot = document.getElementById('connDot');
+const connLabel = document.getElementById('connLabel');
+const pairPanel = document.getElementById('pairPanel');
+const codeInput = document.getElementById('codeInput');
+const connectBtn = document.getElementById('connectBtn');
+const statusMsg = document.getElementById('statusMsg');
+const alertsList = document.getElementById('alertsList');
+const togglePill = document.getElementById('togglePill');
+
+// Check URL for code
+const urlCode = new URLSearchParams(location.search).get('code');
+if (urlCode) codeInput.value = urlCode.toUpperCase();
+
+// ─── Signaling ────────────────────────────────────────────
+signaling.connect();
+
+signaling.addEventListener('open', () => {
+  setConn('online', 'CONNECTED');
+  if (roomCode) joinRoom(roomCode); // rejoin after reconnect
+});
+
+signaling.addEventListener('close', () => {
+  setConn('', 'OFFLINE');
+  setStatus('Connection lost. Reconnecting...', false);
+});
+
+signaling.addEventListener('message', async ({ detail: msg }) => {
+  if (msg.type === 'joined') {
+    roomCode = msg.code;
+    setStatus('Paired! ' + (msg.cameraOnline ? 'Waiting for stream...' : 'Camera offline'), msg.cameraOnline);
+    if (msg.cameraOnline) offlineTxt.textContent = 'CAMERA ONLINE — WAITING FOR STREAM';
+    else offlineTxt.textContent = 'CAMERA IS OFFLINE';
+  }
+
+  if (msg.type === 'error') {
+    setStatus('Error: ' + msg.message, false);
+    roomCode = null;
+  }
+
+  if (msg.type === 'camera-ready') {
+    setStatus('Camera online!', true);
+    offlineTxt.textContent = 'CAMERA ONLINE — CONNECTING…';
+  }
+
+  if (msg.type === 'camera-disconnected') {
+    setStatus('Camera went offline', false);
+    offlineMsg.style.display = 'flex';
+    offlineTxt.textContent = 'CAMERA OFFLINE';
+    videoEl.srcObject = null;
+    liveBadge.classList.remove('show');
+    setConn('online', 'CAMERA OFFLINE');
+  }
+
+  if (msg.type === 'offer') {
+    await handleOffer(msg.sdp);
+  }
+
+  if (msg.type === 'ice-candidate') {
+    if (peer) await peer.handleIce(msg.candidate);
+  }
+
+  if (msg.type === 'motion-alert') {
+    showAlert(msg.event);
+  }
+
+  if (msg.type === 'events-history') {
+    alertsList.innerHTML = '';
+    msg.events.slice().reverse().forEach(e => addAlertItem(e));
+  }
+});
+
+// ─── Room join ────────────────────────────────────────────
+function joinRoom(code) {
+  signaling.send({ type: 'join-viewer', code });
+}
+
+connectBtn.addEventListener('click', () => {
+  const code = codeInput.value.trim().toUpperCase();
+  if (!code || code.length !== 6) {
+    setStatus('Enter a 6-character code', false);
+    return;
+  }
+  setStatus('Connecting…', null);
+  joinRoom(code);
+});
+
+codeInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') connectBtn.click();
+});
+
+// Auto-connect from URL
+if (urlCode) {
+  setTimeout(() => connectBtn.click(), 500);
+}
+
+// ─── WebRTC ───────────────────────────────────────────────
+async function handleOffer(sdp) {
+  if (peer) { peer.close(); peer = null; }
+  peer = new PeerViewer(signaling);
+
+  peer.addEventListener('stream', ({ detail: stream }) => {
+    videoEl.srcObject = stream;
+    offlineMsg.style.display = 'none';
+    liveBadge.classList.add('show');
+    setConn('watching', 'WATCHING');
+    setStatus('Live stream active', true);
+    startLatencyMeasure();
+  });
+
+  peer.addEventListener('statechange', ({ detail: state }) => {
+    if (state === 'disconnected' || state === 'failed') {
+      offlineMsg.style.display = 'flex';
+      offlineTxt.textContent = 'RECONNECTING…';
+      liveBadge.classList.remove('show');
+      setConn('online', 'RECONNECTING');
+    }
+  });
+
+  await peer.handleOffer(sdp);
+}
+
+// ─── Latency measurement ──────────────────────────────────
+function startLatencyMeasure() {
+  if (!peer) return;
+  setInterval(() => {
+    if (!peer || !peer.pc) return;
+    peer.pc.getStats().then(stats => {
+      stats.forEach(report => {
+        if (report.type === 'inbound-rtp' && report.kind === 'video') {
+          const jitter = Math.round((report.jitter || 0) * 1000);
+          latencyBadge.textContent = jitter > 0 ? `~${jitter}ms` : '';
+        }
+      });
+    }).catch(() => {});
+  }, 2000);
+}
+
+// ─── Alerts ───────────────────────────────────────────────
+function showAlert(event) {
+  // Flash
+  motionFlash.classList.add('active');
+  setTimeout(() => motionFlash.classList.remove('active'), 400);
+
+  addAlertItem(event, true);
+
+  if (notifEnabled) {
+    notifMgr.notify(
+      '⚡ Motion Detected!',
+      `Alert from your camera at ${new Date(event.timestamp).toLocaleTimeString()}`,
+      event.snapshot
+    );
+  }
+}
+
+function addAlertItem(event, prepend = false) {
+  // Remove "no alerts" placeholder
+  const placeholder = alertsList.querySelector('[style*="No alerts"]');
+  if (placeholder) placeholder.remove();
+
+  const time = new Date(event.timestamp).toLocaleTimeString('en-US', { hour12: false });
+  const div = document.createElement('div');
+  div.className = 'alert-item';
+  div.innerHTML = `
+    <span class="al-icon">⚡</span>
+    <span class="al-text">Motion detected</span>
+    <span class="al-time">${time}</span>
+    ${event.snapshot ? `<img class="al-thumb" src="${event.snapshot}" alt="">` : ''}
+  `;
+  div.addEventListener('click', () => {
+    if (event.snapshot) {
+      const w = window.open();
+      w.document.body.style.background = '#000';
+      w.document.body.innerHTML = `<img src="${event.snapshot}" style="max-width:100%;max-height:100vh">`;
+    }
+  });
+
+  if (prepend) alertsList.prepend(div);
+  else alertsList.appendChild(div);
+
+  if (alertsList.children.length > 20) alertsList.lastChild.remove();
+}
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  alertsList.innerHTML = '<div style="font-family:var(--mono);font-size:0.6rem;color:var(--text-dim);padding:0.5rem">No alerts yet</div>';
+});
+
+// ─── Notifications ────────────────────────────────────────
+document.getElementById('notifToggle').addEventListener('click', async () => {
+  if (!notifEnabled) {
+    const granted = await notifMgr.requestPermission();
+    notifEnabled = granted;
+    if (!granted) return;
+  } else {
+    notifEnabled = false;
+  }
+  togglePill.classList.toggle('on', notifEnabled);
+});
+
+// ─── Fullscreen ───────────────────────────────────────────
+document.getElementById('videoWrap').addEventListener('click', () => {
+  const wrap = document.getElementById('videoWrap');
+  if (!document.fullscreenElement) wrap.requestFullscreen?.().catch(() => {});
+  else document.exitFullscreen?.().catch(() => {});
+});
+
+// ─── Helpers ─────────────────────────────────────────────
+function setConn(cls, label) {
+  connDot.className = 'conn-dot ' + cls;
+  connLabel.textContent = label;
+}
+
+function setStatus(msg, ok) {
+  statusMsg.textContent = msg;
+  statusMsg.className = 'status-msg' + (ok === true ? ' success' : ok === false ? ' error' : '');
+}
+
+setStatus('Enter the 6-character code from the camera device', null);
+</script>
+</body>
+</html>

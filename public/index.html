@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SecureCam</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080b0f;
+    --surface: #0d1117;
+    --border: #1a2332;
+    --accent: #00e5ff;
+    --accent2: #ff3d71;
+    --text: #c8d6e5;
+    --text-dim: #4a6080;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Rajdhani', sans-serif;
+    --glow: 0 0 20px rgba(0,229,255,0.3);
+  }
+
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); overflow: hidden; }
+
+  .grid-bg {
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: gridDrift 20s linear infinite;
+  }
+  @keyframes gridDrift { to { background-position: 40px 40px; } }
+
+  .scan-line {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(transparent 50%, rgba(0,0,0,0.03) 50%);
+    background-size: 100% 4px;
+    animation: scanLines 0.1s linear infinite;
+  }
+  @keyframes scanLines { to { background-position: 0 4px; } }
+
+  .container {
+    position: relative; z-index: 2;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100vh; padding: 2rem; gap: 3rem;
+  }
+
+  .logo-wrap {
+    text-align: center;
+    animation: fadeUp 0.8s ease both;
+  }
+
+  .logo-icon {
+    width: 72px; height: 72px;
+    margin: 0 auto 1.5rem;
+    position: relative;
+  }
+
+  .logo-icon svg { width: 100%; height: 100%; }
+
+  .logo-ring {
+    position: absolute; inset: -8px;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    opacity: 0.3;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .logo-ring:nth-child(2) { inset: -16px; animation-delay: 0.5s; opacity: 0.15; }
+  @keyframes pulse { 0%,100%{transform:scale(1);opacity:0.3} 50%{transform:scale(1.1);opacity:0.1} }
+
+  h1 {
+    font-family: var(--mono); font-size: clamp(2rem, 8vw, 3.5rem);
+    font-weight: 400; letter-spacing: 0.3em;
+    color: var(--accent);
+    text-shadow: 0 0 30px rgba(0,229,255,0.5);
+  }
+  .tagline {
+    font-family: var(--mono); font-size: 0.7rem;
+    color: var(--text-dim); letter-spacing: 0.2em; margin-top: 0.5rem;
+  }
+
+  .cards {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+    width: 100%; max-width: 520px;
+    animation: fadeUp 0.8s 0.2s ease both;
+  }
+
+  .card {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1rem; padding: 2.5rem 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    text-decoration: none; color: var(--text);
+    cursor: pointer; overflow: hidden;
+    transition: border-color 0.3s, transform 0.2s;
+  }
+
+  .card::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, transparent 60%, rgba(0,229,255,0.04));
+    opacity: 0; transition: opacity 0.3s;
+  }
+
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card:hover::before { opacity: 1; }
+  .card:hover .card-icon { color: var(--accent); filter: drop-shadow(0 0 8px rgba(0,229,255,0.6)); }
+
+  .card.viewer:hover { border-color: var(--accent2); }
+  .card.viewer:hover .card-icon { color: var(--accent2); filter: drop-shadow(0 0 8px rgba(255,61,113,0.6)); }
+
+  .card-icon {
+    font-size: 2.5rem; transition: all 0.3s;
+    color: var(--text-dim);
+  }
+
+  .card-title {
+    font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.15em;
+    text-align: center;
+  }
+
+  .card-sub {
+    font-size: 0.75rem; color: var(--text-dim);
+    text-align: center; line-height: 1.4;
+  }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 0.75rem;
+    font-family: var(--mono); font-size: 0.65rem;
+    color: var(--text-dim); letter-spacing: 0.1em;
+    animation: fadeUp 0.8s 0.4s ease both;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #2ecc71; animation: blink 1.5s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="scan-line"></div>
+
+<div class="container">
+  <div class="logo-wrap">
+    <div class="logo-icon">
+      <div class="logo-ring"></div>
+      <div class="logo-ring"></div>
+      <svg viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="36" cy="36" r="28" stroke="#00e5ff" stroke-width="1.5" opacity="0.4"/>
+        <circle cx="36" cy="36" r="18" stroke="#00e5ff" stroke-width="1.5" opacity="0.6"/>
+        <circle cx="36" cy="36" r="8" fill="#00e5ff" opacity="0.9"/>
+        <line x1="36" y1="8" x2="36" y2="14" stroke="#00e5ff" stroke-width="1.5"/>
+        <line x1="36" y1="58" x2="36" y2="64" stroke="#00e5ff" stroke-width="1.5"/>
+        <line x1="8" y1="36" x2="14" y2="36" stroke="#00e5ff" stroke-width="1.5"/>
+        <line x1="58" y1="36" x2="64" y2="36" stroke="#00e5ff" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <h1>SECURECAM</h1>
+    <div class="tagline">BROWSER-BASED SURVEILLANCE SYSTEM</div>
+  </div>
+
+  <div class="cards">
+    <a class="card camera" href="/camera">
+      <div class="card-icon">📷</div>
+      <div class="card-title">CAMERA MODE</div>
+      <div class="card-sub">Stream & detect motion from this device</div>
+    </a>
+    <a class="card viewer" href="/viewer">
+      <div class="card-icon">📱</div>
+      <div class="card-title">VIEWER MODE</div>
+      <div class="card-sub">Watch live stream & receive alerts</div>
+    </a>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot"></div>
+    SYSTEM ONLINE · ENCRYPTED · NO APP REQUIRED
+  </div>
+</div>
+</body>
+</html>
